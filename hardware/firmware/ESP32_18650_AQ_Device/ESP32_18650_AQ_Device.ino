@@ -32,6 +32,7 @@ WebServer server(80);
 const char* ssid     = "Nyi Nyi Nyan Tun";
 const char* password = "nyinyitun";
 
+const String deviceId = "aq_sense01";
 const char* host = "api.thingspeak.com";
 const String apiKey = "WN53H3MB5O2KJDSO";
 
@@ -455,6 +456,7 @@ void sendData(int pm25[], int pm10[], int co2[], int temp[], int pres[], int hum
                "&field6=" + String(getAvg(hum, window)) +
                "&field7=" + String(getAvg(iaq, window)) +
                "&field8=" + String(getAvg(bat, window));
+               // + "&id=" + deviceId;
 
   Serial.print("Request URL: ");
   Serial.println(url);
