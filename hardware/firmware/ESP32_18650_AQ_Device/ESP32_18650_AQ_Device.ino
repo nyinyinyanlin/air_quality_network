@@ -55,11 +55,6 @@ int pres[MOV_AVG_WDW];
 int iaq[MOV_AVG_WDW];
 float vbat[MOV_AVG_WDW];
 
-void Reboot(){
-  Serial.println("Rebooting....");
-  ESP.restart();
-}
-
 void popArray(float arr[], int n) {
   for (int i = 0; i < n; i++) {
     arr[i] = 0.0;
