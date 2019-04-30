@@ -55,6 +55,11 @@ int pres[MOV_AVG_WDW];
 int iaq[MOV_AVG_WDW];
 float vbat[MOV_AVG_WDW];
 
+void Reboot(){
+  Serial.println("Rebooting....");
+  ESP.restart();
+}
+
 void popArray(float arr[], int n) {
   for (int i = 0; i < n; i++) {
     arr[i] = 0.0;
@@ -125,6 +130,11 @@ String CalculateIAQ(float score) {
 
 void handleRoot() {
   server.send(200, "text/plain", "hello from esp32!");
+}
+
+void espReboot(){
+  Serial.println("Restarting ESP...");
+  ESP.restart();
 }
 
 bool checkWifi() {
