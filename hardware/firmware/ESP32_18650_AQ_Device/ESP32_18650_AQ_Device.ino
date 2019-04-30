@@ -16,6 +16,7 @@
 #define READ_INTERVAL 1000
 #define SEND_INTERVAL 10000
 #define WARMUP_INTERVAL 90000
+#define RESET_PIN 15
 
 long read_start = 0;
 long send_start = 0;
@@ -233,6 +234,9 @@ void setup() {
 }
 
 void loop() {
+  if(digitalRead(RESET_PIN)){
+    espReboot();
+  }
   server.handleClient();
   if ((millis() - read_start) >= READ_INTERVAL) {
     Serial.println("**DEBUG**");
