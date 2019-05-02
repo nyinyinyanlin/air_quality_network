@@ -163,6 +163,7 @@ bool checkWifi() {
         Serial.println("MDNS: Error Setting Up");
       } else {
         Serial.println("MDNS: Listening on esp32.local");
+        MDNS.
         MDNS_STATUS = true;
       }
       Serial.println();
@@ -233,6 +234,7 @@ void setup() {
   // Add service to MDNS-SD
   server.on("/", handleRoot);
   server.begin();
+  MDNS.addService("_http","_tcp",80);
   delay(1000);
 }
 
