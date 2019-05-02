@@ -16,7 +16,7 @@
 #define READ_INTERVAL 1000
 #define SEND_INTERVAL 10000
 #define WARMUP_INTERVAL 90000
-#define RESET_PIN 15
+#define RESET_PIN 27
 
 long read_start = 0;
 long send_start = 0;
@@ -130,7 +130,7 @@ void handleRoot() {
 }
 
 void espReboot(){
-  Serial.println("Restarting ESP...");
+  Serial.println("Restarting ESP32...");
   ESP.restart();
 }
 
@@ -196,7 +196,9 @@ void setup() {
   Serial.begin(9600);
   sds011.begin(9600, SERIAL_8N1, 2, 4);
   ndir.begin(9600, SERIAL_8N1, 16, 17);
-
+  Serial.println("Device Starting...");
+  delay(2000);
+  pinMode(RESET_PIN,INPUT_PULLUP);
   if (!bme.begin()) {
     Serial.println("Could not find a valid BME680 sensor, check wiring!");
     while (1);
@@ -235,7 +237,7 @@ void setup() {
 }
 
 void loop() {
-  if(digitalRead(RESET_PIN)){
+  if(!digitalRead(RESET_PIN)){
     espReboot();
   }
   server.handleClient();
