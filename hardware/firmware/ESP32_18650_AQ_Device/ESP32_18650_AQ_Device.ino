@@ -17,11 +17,14 @@
 #define SEND_INTERVAL 10000
 #define WARMUP_INTERVAL 90000
 #define RESET_PIN 27
+#define WIFIAP_MODE 0
+#define WIFISTA_MODE 1
 
 long read_start = 0;
 long send_start = 0;
 bool warmup_over = false;
 bool MDNS_STATUS = false;
+bool wifi_mode = WIFISTA_MODE;
 
 HardwareSerial ndir(1);
 HardwareSerial sds011(2);
@@ -30,6 +33,7 @@ Adafruit_BME680 bme;
 WebServer server(80);
 
 const char* ssid     = "Nyi Nyi Nyan Tun";
+const char* ap_ssid     = "ESP32 AQ";
 const char* password = "nyinyitun";
 
 const String deviceId = "aq_sense01";
@@ -129,14 +133,20 @@ void handleRoot() {
   server.send(200, "text/plain", "hello from esp32!");
 }
 
-void espReboot(){
+void espReboot() {
   Serial.println("Restarting ESP32...");
   ESP.restart();
 }
 
-bool checkWifi() {
-  Serial.println("[Wifi]");
+
+
+bool checkWifiSTA() {
+  Serial.println("[Wifi STA]");
   Serial.println("==========");
+  if (wifi_mode == WIFIAP_MODE) {
+    Serial.println("Status: Wifi is in Access Point mode, not uploading data.");
+    return false;
+  }
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("Status: Disconnected");
     Serial.print("Connecting SSID: ");
@@ -163,7 +173,6 @@ bool checkWifi() {
         Serial.println("MDNS: Error Setting Up");
       } else {
         Serial.println("MDNS: Listening on esp32.local");
-        MDNS.
         MDNS_STATUS = true;
       }
       Serial.println();
@@ -197,9 +206,32 @@ void setup() {
   Serial.begin(9600);
   sds011.begin(9600, SERIAL_8N1, 2, 4);
   ndir.begin(9600, SERIAL_8N1, 16, 17);
-  Serial.println("Device Starting...");
+  pinMode(RESET_PIN, INPUT_PULLUP);
+  Serial.println("Device Booting...");
   delay(2000);
-  pinMode(RESET_PIN,INPUT_PULLUP);
+  // See if RESET Button is still pressed
+  if (!digitalRead(RESET_PIN)) {
+    // If pressed, boot up in Wifi AP Mode
+    wifi_mode = WIFIAP_MODE;
+    WiFi.softAP(ap_ssid);
+    Serial.println("WiFi Access Point Mode");
+    Serial.print("SSID: ");
+    Serial.println(ap_ssid);
+    Serial.print("Gateway Address: ");
+    Serial.println(WiFi.softAPIP());
+    if (!MDNS.begin("esp32")) {
+      Serial.println("MDNS: Error Setting Up");
+    } else {
+      Serial.println("MDNS: Listening on esp32.local");
+      MDNS_STATUS = true;
+    }
+    Serial.println();
+  } else {
+    // boot up in Wifi STA Mode
+    Serial.println("WiFi Station Mode");
+    wifi_mode = WIFISTA_MODE;
+    checkWifiSTA();
+  }
   if (!bme.begin()) {
     Serial.println("Could not find a valid BME680 sensor, check wiring!");
     while (1);
@@ -228,18 +260,17 @@ void setup() {
   Serial.println("Status: Warm Up Started");
   Serial.println();
   WiFi.disconnect();
-  checkWifi();
   Serial.println("TCP server started");
 
   // Add service to MDNS-SD
   server.on("/", handleRoot);
   server.begin();
-  MDNS.addService("_http","_tcp",80);
+  MDNS.addService("_http", "_tcp", 80);
   delay(1000);
 }
 
 void loop() {
-  if(!digitalRead(RESET_PIN)){
+  if (!digitalRead(RESET_PIN)) {
     espReboot();
   }
   server.handleClient();
@@ -385,59 +416,59 @@ void loop() {
             }
           }
         } else {
-        Serial.print("Invalid Start Byte: ");
-        Serial.print(f_b, HEX);
+          Serial.print("Invalid Start Byte: ");
+          Serial.print(f_b, HEX);
+        }
       }
+    } else if (timeout) {
+      pushArray(0, pm25, MOV_AVG_WDW);
+      pushArray(0, pm10, MOV_AVG_WDW);
     }
-  } else if (timeout) {
-    pushArray(0, pm25, MOV_AVG_WDW);
-    pushArray(0, pm10, MOV_AVG_WDW);
-  }
-  read_start = millis();
-  Serial.println();
-}
-
-if (((millis() - send_start) >= SEND_INTERVAL) && (warmup_over)) {
-  Serial.println("[INFORMATION]");
-  Serial.println("==========");
-  Serial.print("PM10: ");
-  Serial.print(getAvg(pm10, MOV_AVG_WDW));
-  Serial.println("ug/m^3");
-  Serial.print("PM25: ");
-  Serial.print(getAvg(pm25, MOV_AVG_WDW));
-  Serial.println("ug/m^3");
-  Serial.print("Temperature: ");
-  Serial.print(getAvg(temp, MOV_AVG_WDW));
-  Serial.println("*C");
-  Serial.print("Pressure: ");
-  Serial.print(getAvg(pres, MOV_AVG_WDW) / 100.0);
-  Serial.println("hPa");
-  Serial.print("Humidity: ");
-  Serial.print(getAvg(hum, MOV_AVG_WDW));
-  Serial.println("%");
-  Serial.print("CO2: ");
-  Serial.print(getAvg(co2, MOV_AVG_WDW));
-  Serial.println("PPM");
-  Serial.print("IAQ(VOC): ");
-  Serial.print(getAvg(iaq, MOV_AVG_WDW));
-  Serial.println("%");
-  Serial.print("Battery: ");
-  Serial.print(getAvg(vbat, MOV_AVG_WDW));
-  Serial.println("V");
-  Serial.println();
-  if (checkWifi()) {
-    sendData(pm25, pm10, co2, temp, pres, hum, iaq, vbat, MOV_AVG_WDW);
-  }
-  send_start = millis();
-} else if (!warmup_over) {
-  if (millis() > WARMUP_INTERVAL) {
-    Serial.println("[WARM UP]");
-    Serial.println("==========");
-    Serial.println("Status: Warm Up Finished");
+    read_start = millis();
     Serial.println();
-    warmup_over = true;
   }
-}
+
+  if (((millis() - send_start) >= SEND_INTERVAL) && (warmup_over)) {
+    Serial.println("[INFORMATION]");
+    Serial.println("==========");
+    Serial.print("PM10: ");
+    Serial.print(getAvg(pm10, MOV_AVG_WDW));
+    Serial.println("ug/m^3");
+    Serial.print("PM25: ");
+    Serial.print(getAvg(pm25, MOV_AVG_WDW));
+    Serial.println("ug/m^3");
+    Serial.print("Temperature: ");
+    Serial.print(getAvg(temp, MOV_AVG_WDW));
+    Serial.println("*C");
+    Serial.print("Pressure: ");
+    Serial.print(getAvg(pres, MOV_AVG_WDW) / 100.0);
+    Serial.println("hPa");
+    Serial.print("Humidity: ");
+    Serial.print(getAvg(hum, MOV_AVG_WDW));
+    Serial.println("%");
+    Serial.print("CO2: ");
+    Serial.print(getAvg(co2, MOV_AVG_WDW));
+    Serial.println("PPM");
+    Serial.print("IAQ(VOC): ");
+    Serial.print(getAvg(iaq, MOV_AVG_WDW));
+    Serial.println("%");
+    Serial.print("Battery: ");
+    Serial.print(getAvg(vbat, MOV_AVG_WDW));
+    Serial.println("V");
+    Serial.println();
+    if (checkWifiSTA()) {
+      sendData(pm25, pm10, co2, temp, pres, hum, iaq, vbat, MOV_AVG_WDW);
+    }
+    send_start = millis();
+  } else if (!warmup_over) {
+    if (millis() > WARMUP_INTERVAL) {
+      Serial.println("[WARM UP]");
+      Serial.println("==========");
+      Serial.println("Status: Warm Up Finished");
+      Serial.println();
+      warmup_over = true;
+    }
+  }
 }
 
 void sendData(int pm25[], int pm10[], int co2[], int temp[], int pres[], int hum[], int iaq[], float bat[], int window) {
@@ -460,7 +491,7 @@ void sendData(int pm25[], int pm10[], int co2[], int temp[], int pres[], int hum
                "&field6=" + String(getAvg(hum, window)) +
                "&field7=" + String(getAvg(iaq, window)) +
                "&field8=" + String(getAvg(bat, window));
-               // + "&id=" + deviceId;
+  // + "&id=" + deviceId;
 
   Serial.print("Request URL: ");
   Serial.println(url);
